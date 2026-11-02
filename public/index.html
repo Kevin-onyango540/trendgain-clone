@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Create Account — TRENDGAIN</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="header"><div class="logo"><div class="logo-icon">TR</div><div>TRENDGAIN<small>EARN • GROW</small></div></div><div>🌙</div></div>
+
+<div class="container">
+  <div class="card">
+    <div class="card-top"><div class="icon-box">👤+</div><h2>Create your account</h2></div>
+    <div class="field" style="margin-top:16px"><span class="label">👤 Sponsor: <b>Homepage</b></span></div>
+
+    <div class="field"><span class="label">Username</span><input class="input" id="username" placeholder="e.g. Yannik254"></div>
+
+    <div class="field">
+      <span class="label">Country</span>
+      <div class="country-input" id="countryBtn" onclick="toggleCountry()">
+        <span class="flag" id="flag">🇰🇪</span><span id="countryName">Kenya</span><span style="margin-left:auto">▼</span>
+      </div>
+      <div class="country-list" id="countryList"></div>
+    </div>
+
+    <div class="field"><span class="label">Phone number</span>
+      <div style="display:flex;gap:8px">
+        <span id="codeDisplay" style="background:#ffe0f3;color:#ff0090;padding:15px 12px;border-radius:14px;font-weight:900;border:1.5px solid #fde6ff">+254</span>
+        <input class="input" id="phone" type="tel" placeholder="113 663 303" inputmode="numeric" style="flex:1">
+      </div>
+    </div>
+
+    <div class="field"><span class="label">Password</span><input class="input" id="password" type="password" placeholder="At least 6 characters"></div>
+    <div class="field"><button class="btn-primary" id="createBtn" onclick="createAcc()">Create account →</button></div>
+    <div class="small-link">Already have an account? <a href="login.html">Sign in</a></div>
+  </div>
+</div>
+
+<script>
+const countries = [
+  {name:"Kenya", code:"+254", flag:"🇰🇪"},
+  {name:"Uganda", code:"+256", flag:"🇺🇬"},
+  {name:"Tanzania", code:"+255", flag:"🇹🇿"},
+  {name:"Rwanda", code:"+250", flag:"🇷🇼"},
+  {name:"Congo, DRC", code:"+243", flag:"🇨🇩"},
+  {name:"Nigeria", code:"+234", flag:"🇳🇬"},
+  {name:"Ghana", code:"+233", flag:"🇬🇭"},
+  {name:"South Africa", code:"+27", flag:"🇿🇦"},
+  {name:"Zambia", code:"+260", flag:"🇿🇲"},
+  {name:"Ethiopia", code:"+251", flag:"🇪🇹"},
+  {name:"USA", code:"+1", flag:"🇺🇸"},
+  {name:"UK", code:"+44", flag:"🇬🇧"},
+  {name:"India", code:"+91", flag:"🇮🇳"},
+  {name:"UAE", code:"+971", flag:"🇦🇪"}
+];
+let selectedCountry = countries[0];
+
+function renderCountries(){
+  const list = document.getElementById('countryList');
+  list.innerHTML = countries.map(c=>`
+    <div class="country-item" onclick="selectCountry('${c.code}')">
+      <span class="flag">${c.flag}</span><span style="flex:1;font-weight:600">${c.name}</span><span style="color:#6b7280">${c.code}</span>
+    </div>
+  `).join('');
+}
+function toggleCountry(){ document.getElementById('countryList').classList.toggle('show'); }
+function selectCountry(code){
+  selectedCountry = countries.find(c=>c.code===code);
+  document.getElementById('flag').innerText = selectedCountry.flag;
+  document.getElementById('countryName').innerText = selectedCountry.name;
+  document.getElementById('codeDisplay').innerText = selectedCountry.code;
+  document.getElementById('countryList').classList.remove('show');
+}
+renderCountries();
+
+async function createAcc(){
+  const username=document.getElementById('username').value.trim();
+  const phone=document.getElementById('phone').value.trim();
+  const password=document.getElementById('password').value;
+  if(!username||!phone||!password) return alert('Jaza kila kitu');
+  if(password.length<6) return alert('Password iwe angalau 6');
+  
+  const btn=document.getElementById('createBtn');
+  btn.innerHTML='Creating...'; btn.disabled=true;
+
+  const phoneFull = selectedCountry.code + phone;
+  
+  try{
+    const res = await fetch('/api/create-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username, phone, phoneFull, country:selectedCountry.name, countryCode:selectedCountry.code, password})});
+    const data = await res.json();
+    if(data.success){
+      // SAVE KWA LOGIN
+      localStorage.setItem('temp_phone', phone);
+      localStorage.setItem('temp_username', username);
+      // PELEKA KWA LOGIN NA MESSAGE
+      location.href='login.html?created=1';
+    }else{
+      alert(data.msg);
+      btn.innerHTML='Create account →'; btn.disabled=false;
+    }
+  }catch(e){
+    // Kama server iko offline, bado peleka login
+    localStorage.setItem('temp_phone', phone);
+    location.href='login.html?created=1';
+  }
+}
+
+document.addEventListener('click', (e)=>{
+  if(!e.target.closest('#countryBtn') && !e.target.closest('#countryList')){
+    document.getElementById('countryList').classList.remove('show');
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sign in — TRENDGAIN</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="header"><div class="logo"><div class="logo-icon">TR</div><div>TRENDGAIN<small>EARN • GROW</small></div></div></div>
+
+<div class="container">
+  <div class="card">
+    <div class="card-top">
+      <div class="icon-box">🔐</div>
+      <h2>Welcome back</h2>
+      <p>Login to continue earning</p>
+    </div>
+
+    <!-- MESSAGE YA ACCOUNT CREATED -->
+    <div id="createdMsg" style="display:none;margin:14px 16px 0;background:#d1fae5;border:1px solid #a7f3d0;color:#065f46;padding:12px 14px;border-radius:12px;font-weight:700;font-size:13.5px;text-align:center">
+      ✅ Account created, sign in
+    </div>
+
+    <div class="field" style="margin-top:16px">
+      <span class="label">Phone number</span>
+      <input class="input" id="phone" type="tel" placeholder="Your phone used before" inputmode="numeric">
+    </div>
+    <div class="field">
+      <span class="label">Password</span>
+      <input class="input" id="password" type="password" placeholder="Enter same password">
+    </div>
+    <div class="field">
+      <button class="btn-primary" id="loginBtn" onclick="login()">Sign in →</button>
+    </div>
+    <div class="small-link">No account? <a href="index.html">Create account</a></div>
+  </div>
+</div>
+
+<script>
+// ONYESHA MESSAGE KAMA AMETOKA KWA CREATE
+const urlParams = new URLSearchParams(window.location.search);
+if(urlParams.get('created')==='1'){
+  document.getElementById('createdMsg').style.display='block';
+  const tempPhone = localStorage.getItem('temp_phone');
+  if(tempPhone) document.getElementById('phone').value = tempPhone;
+}
+
+async function login(){
+  const phone=document.getElementById('phone').value.trim();
+  const password=document.getElementById('password').value;
+  if(!phone||!password) return alert('Jaza phone na password');
+
+  const btn=document.getElementById('loginBtn');
+  btn.innerHTML='Signing in...'; btn.disabled=true;
+
+  try{
+    const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,password})});
+    const data=await res.json();
+    
+    if(data.success){
+      localStorage.setItem('phone', data.user.phone);
+      localStorage.setItem('phoneFull', data.user.phoneFull||data.user.phone);
+      localStorage.setItem('username', data.user.username);
+      localStorage.removeItem('temp_phone');
+      
+      // FLOW SAHIHI SASA: LOGIN -> ACTIVATE -> QUIZ
+      if(data.user.activated){
+        location.href='quiz.html';
+      }else{
+        location.href='activate.html';
+      }
+    }else{
+      alert(data.msg);
+      btn.innerHTML='Sign in →'; btn.disabled=false;
+    }
+  }catch(e){
+    // Fallback - kama server haipo, peleka activation
+    localStorage.setItem('phone', phone);
+    location.href='activate.html';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activate - TRENDGAIN</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body style="background:linear-gradient(135deg,#7a00ff,#ff0099);min-height:100vh;display:grid;place-items:center">
+<div class="card" style="max-width:400px;width:90%;padding:24px;text-align:center">
+  <div style="width:60px;height:60px;background:linear-gradient(135deg,#ff0099,#7a00ff);border-radius:16px;display:grid;place-items:center;color:white;font-weight:900;font-size:24px;margin:0 auto 12px">T</div>
+  <h2 style="font-weight:900">Activate Account</h2>
+  <p style="font-size:13px;color:#6b7280;margin:8px 0 16px">Lipa <b>KES 100</b> tu ku-unlock quiz. Utalipwa $1 kwa kila swali sahihi.</p>
+  
+  <div style="background:#f8f9ff;border:1px solid #eef2ff;border-radius:12px;padding:12px;text-align:left;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;font-size:13px"><span>Phone:</span><b id="phoneShow">-</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>Amount:</span><b>KES 100</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>Paybill:</span><b>TRENDGAIN</b></div>
+  </div>
+
+  <div id="status"></div>
+
+  <button id="payBtn" onclick="pay()" style="width:100%;padding:15px;background:linear-gradient(135deg,#10b981,#065f46);color:white;border:none;border-radius:14px;font-weight:900;font-size:15px;box-shadow:0 6px 18px rgba(16,185,129,0.3)">
+    📱 Lipa KES 100 na M-Pesa (STK Push)
+  </button>
+
+  <p style="font-size:11px;color:#9ca3af;margin-top:12px">Uta-pokea pop-up ya M-Pesa kwa simu yako. Weka PIN yako.</p>
+  <button onclick="location.href='quiz.html'" style="margin-top:10px;background:none;border:none;color:#7a00ff;font-weight:700;font-size:12px">Nimelipa tayari? Check →</button>
+</div>
+
+<script>
+const phone = localStorage.getItem('phone');
+const phoneFull = localStorage.getItem('phoneFull') || phone;
+if(!phone) location.href='login.html';
+document.getElementById('phoneShow').innerText = phoneFull;
+
+let checking = null;
+
+async function pay(){
+  const btn = document.getElementById('payBtn');
+  btn.disabled = true;
+  btn.innerText = '⏳ Sending STK Push...';
+  document.getElementById('status').innerHTML = `<div class="alert alert-success" style="font-size:13px">📲 STK Push inatumwa kwa ${phoneFull}<br>Check simu yako...</div>`;
+
+  try{
+    const res = await fetch('/api/daraja/stkpush',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone, amount:100})
+    });
+    const data = await res.json();
+    
+    if(data.success){
+      document.getElementById('status').innerHTML = `<div class="alert alert-success">✅ ${data.msg}<br><small>Checkout: ${data.checkoutId}</small><br><br>⏳ Tunangojea malipo... Weka PIN kwenye simu.</div>`;
+      btn.innerText = '⏳ Waiting for M-Pesa...';
+      // Anza ku-check kila 3 sec kama amelipa
+      checking = setInterval(checkActivation, 3000);
+      // Simulate activation kama ni sandbox bila callback
+      if(data.simulated){
+        setTimeout(async()=>{
+          // Simulate user akilipa
+          try{ await fetch('/api/daraja/callback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Body:{stkCallback:{CheckoutRequestID:data.checkoutId,ResultCode:0}}})}); }catch(e){}
+        }, 8000);
+      }
+    }else{
+      document.getElementById('status').innerHTML = `<div class="alert alert-error">${data.msg}</div>`;
+      btn.disabled = false;
+      btn.innerText = '📱 Lipa KES 100 na M-Pesa (STK Push)';
+    }
+  }catch(e){
+    document.getElementById('status').innerHTML = `<div class="alert alert-error">Network error: ${e.message}</div>`;
+    btn.disabled = false;
+    btn.innerText = '📱 Jaribu tena';
+  }
+}
+
+async function checkActivation(){
+  try{
+    const res = await fetch('/api/check-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    const d = await res.json();
+    if(d.activated){
+      clearInterval(checking);
+      document.getElementById('status').innerHTML = `<div class="alert alert-success" style="font-size:16px;font-weight:900">🎉 Malipo yamepokelewa! Account Activated!<br><small>Redirecting to quiz...</small></div>`;
+      setTimeout(()=>location.href='quiz.html', 2000);
+    }
+  }catch(e){}
+}
+
+// Check moja kwa moja kama alishalipa
+setInterval(checkActivation, 4000);
+</script>
+</body>
+</html>

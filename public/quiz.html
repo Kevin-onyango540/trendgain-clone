@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Quiz - Earn $10 — TRENDGAIN</title>
+<link rel="stylesheet" href="style.css">
+<style>
+.progress-wrap{height:8px;background:#f3f5ff;border-radius:10px;overflow:hidden;margin:10px 0 14px}
+.progress-bar{height:100%;background:linear-gradient(90deg,#ff0099,#7a00ff);width:0%;transition:0.5s}
+.timer-box{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.pill{font-size:11px;font-weight:800;padding:6px 11px;border-radius:20px;background:#f3f5ff;color:#374151}
+.pill-fail{background:#fee2e2;color:#991b1b}
+.pill-ok{background:#d1fae5;color:#065f46}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0 12px}
+.stat-box{background:#f8f9ff;border:1px solid #eef2ff;border-radius:12px;padding:10px;text-align:center}
+.stat-num{font-size:18px;font-weight:900;color:#111827}
+.stat-label{font-size:10px;font-weight:700;color:#6b7280;letter-spacing:0.5px;margin-top:2px}
+@keyframes pop{0%{transform:scale(0.9)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
+.pop{animation:pop 0.3s ease}
+.history{max-height:120px;overflow-y:auto;margin-top:10px;border-top:1px solid #f3f5ff;padding-top:8px}
+.history-item{font-size:12px;padding:5px 0;display:flex;justify-content:space-between;border-bottom:1px dashed #f3f5ff}
+</style>
+</head>
+<body style="background:linear-gradient(135deg,#7a00ff 0%,#ff0099 100%);min-height:100vh">
+
+<div class="quiz-topbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <div style="width:30px;height:30px;background:linear-gradient(135deg,#ff0099,#7a00ff);border-radius:8px;display:grid;place-items:center;color:white;font-weight:900;font-size:14px">T</div>
+    <b style="font-size:13px;letter-spacing:0.5px">TRENDGAIN QUIZ</b>
+  </div>
+  <div class="balance-pill" id="topBal">💰 $0.00 • 0/10</div>
+</div>
+
+<div class="container">
+  <div class="card" style="padding:14px 16px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div style="font-size:10px;font-weight:800;color:#6b7280;letter-spacing:1px">YOUR EARNINGS</div>
+        <div style="font-size:24px;font-weight:900;margin-top:4px"><span id="usdBal">$0.00</span></div>
+        <div style="font-size:13px;font-weight:700;color:#7a00ff;margin-top:2px" id="kesBal">KES 0.00</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px">+$1 per correct answer</div>
+      </div>
+      <div style="text-align:right">
+        <div id="withdrawStatus" style="font-size:11px;font-weight:800;color:#ef4444">Need 10 correct</div>
+        <button id="withdrawBtn" onclick="withdraw()" style="margin-top:8px;background:linear-gradient(135deg,#10b981,#065f46);color:white;border:none;padding:10px 16px;border-radius:10px;font-weight:800;font-size:12px;display:none;box-shadow:0 4px 12px rgba(16,185,129,0.3)">💵 Withdraw</button>
+        <div style="font-size:10px;color:#6b7280;margin-top:6px">Min: KES 3000</div>
+      </div>
+    </div>
+    <div class="progress-wrap" style="margin-top:12px"><div class="progress-bar" id="progress"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#6b7280;font-weight:600"><span id="progressText">0/10 correct to withdraw</span><span id="kesConvert">Rate: $1 = KES 129</span></div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-box"><div class="stat-num" id="statAnswered">0</div><div class="stat-label">ANSWERED</div></div>
+    <div class="stat-box" style="background:#f0fdf4;border-color:#bbf7d0"><div class="stat-num" id="statCorrect" style="color:#065f46">0</div><div class="stat-label">CORRECT ✅</div></div>
+    <div class="stat-box" style="background:#fef2f2;border-color:#fecaca"><div class="stat-num" id="statWrong" style="color:#991b1b">0</div><div class="stat-label">WRONG ❌</div></div>
+  </div>
+
+  <div class="card" style="margin-top:0;padding:16px">
+    <div id="status"></div>
+    <div class="timer-box">
+      <span class="pill" id="qCount">QUESTION 1</span>
+      <span class="pill pill-fail" id="failCount">Fails streak: 0/3</span>
+      <span class="pill pill-ok" id="streakCount">Streak: 0 🔥</span>
+    </div>
+    <h3 class="question-text" id="question">Loading question...</h3>
+    <div id="options"></div>
+    <div id="feedback" style="margin-top:12px"></div>
+    <button id="nextBtn" style="display:none;width:100%;margin-top:16px;padding:15px;background:linear-gradient(135deg,#111827,#374151);color:white;border:none;border-radius:14px;font-weight:800;font-size:15px" onclick="loadQuestion()">Next Question →</button>
+
+    <div style="margin-top:14px">
+      <div style="font-size:11px;font-weight:800;color:#6b7280;letter-spacing:0.5px;display:flex;justify-content:space-between"><span>LAST ANSWERS</span><span id="accuracy">Accuracy: 0%</span></div>
+      <div class="history" id="history"><div style="font-size:11px;color:#9ca3af;text-align:center;padding:10px">No answers yet - start answering!</div></div>
+    </div>
+
+    <div style="background:#f9f5ff;border:1px dashed #e9d5ff;border-radius:12px;padding:10px 12px;margin-top:14px">
+      <p style="font-size:11px;color:#6b46c1;line-height:1.5">
+        🎯 Correct = +$1 (KES 129) | Wrong = balance inabaki vile vile<br>
+        💵 Withdraw: Lazima 10 correct + KES 3000<br>
+        ⚠️ Fail 3 mfululizo = disqualified 1 hour<br>
+        🌍 80 maswali rasmi - 4 choices, 1 correct
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentQ=null, currentStreak=0;
+const phone=localStorage.getItem('phone');
+if(!phone){ alert("Phone not found, please login again"); location.href='login.html'; }
+let historyList=[];
+
+async function updateBal(){
+  try{
+    const res=await fetch('/api/balance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    const d=await res.json();
+    document.getElementById('topBal').innerHTML=`💰 $${d.usd.toFixed(2)} • ${d.correct}/10`;
+    document.getElementById('usdBal').innerText=`$${d.usd.toFixed(2)}`;
+    document.getElementById('kesBal').innerText=`KES ${d.kes.toFixed(2)}`;
+    document.getElementById('statAnswered').innerText=d.answered;
+    document.getElementById('statCorrect').innerText=d.correct;
+    document.getElementById('statWrong').innerText=d.wrong;
+    document.getElementById('failCount').innerText=`Fails streak: ${d.fails}/3`;
+    document.getElementById('qCount').innerText=`QUESTION ${d.answered+1}`;
+    const acc = d.answered>0 ? Math.round((d.correct/d.answered)*100) : 0;
+    document.getElementById('accuracy').innerText=`Accuracy: ${acc}%`;
+    const progress = Math.min((d.correct/10)*100,100);
+    document.getElementById('progress').style.width=`${progress}%`;
+    document.getElementById('progressText').innerText=`${d.correct}/10 correct to withdraw`;
+    if(d.canWithdraw){
+      document.getElementById('withdrawStatus').innerHTML=`✅ Ready to withdraw!`;
+      document.getElementById('withdrawStatus').style.color='#065f46';
+      document.getElementById('withdrawBtn').style.display='block';
+    }else{
+      document.getElementById('withdrawStatus').innerHTML=`Need ${10-d.correct} more correct`;
+      if(d.kes<3000) document.getElementById('withdrawStatus').innerHTML+=` + KES ${(3000-d.kes).toFixed(0)}`;
+      document.getElementById('withdrawStatus').style.color='#ef4444';
+      document.getElementById('withdrawBtn').style.display='none';
+    }
+    if(d.disqualifiedUntil){
+      const remaining = new Date(d.disqualifiedUntil).getTime() - Date.now();
+      if(remaining>0){ showDisqualified(Math.ceil(remaining/1000)); return false; }
+    }
+    return true;
+  }catch(e){ return true; }
+}
+
+async function loadQuestion(){
+  try{
+    const ok = await updateBal();
+    if(!ok) return;
+    document.getElementById('feedback').innerHTML='';
+    document.getElementById('nextBtn').style.display='none';
+    document.getElementById('question').innerText='Loading question...';
+    document.getElementById('options').innerHTML='<div style="text-align:center;padding:20px;color:#6b7280">⏳ Loading...</div>';
+
+    let res, data;
+    try{
+      res = await fetch('/api/question',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({phone: phone})
+      });
+      data = await res.json();
+    }catch(e){
+      console.log("POST failed, trying GET", e);
+      res = await fetch('/api/question');
+      data = await res.json();
+    }
+
+    currentQ = data;
+    if(!currentQ || !currentQ.q) throw new Error("Invalid question data");
+
+    document.getElementById('question').innerHTML=`<span style="font-size:10px;background:#f3f5ff;padding:4px 8px;border-radius:6px;color:#7a00ff;font-weight:800">${currentQ.cat||'General'}</span><br><br>${currentQ.q}`;
+    document.getElementById('options').innerHTML=currentQ.options.map((opt,i)=>`
+      <div class="option" onclick="answer(${i})">
+        <div class="letter">${String.fromCharCode(65+i)}</div>
+        <div style="flex:1">${opt}</div>
+      </div>
+    `).join('');
+
+  }catch(e){
+    console.error(e);
+    document.getElementById('question').innerText='Failed to load, tap Next';
+    document.getElementById('options').innerHTML=`<div style="font-size:12px;text-align:center;color:#6b7280">Server error - make sure server is running<br><b>node server.js</b></div>`;
+    document.getElementById('nextBtn').style.display='block';
+  }
+}
+
+async function answer(idx){
+  const isCorrect = idx===currentQ.answer;
+  document.querySelectorAll('.option').forEach((el,i)=>{
+    el.style.pointerEvents='none';
+    if(i===currentQ.answer) el.classList.add('correct');
+    else if(i===idx && !isCorrect) el.classList.add('wrong');
+  });
+  if(navigator.vibrate) navigator.vibrate(isCorrect?[40]:[80,40,80]);
+  try{
+    const res=await fetch('/api/answer',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,isCorrect})});
+    const data=await res.json();
+    if(data.disqualified){ showDisqualified(data.seconds||3600); return; }
+    if(isCorrect){
+      currentStreak++;
+      document.getElementById('feedback').innerHTML=`<div class="alert alert-success pop">✅ Correct! +$1 (KES 129) added</div>`;
+      historyList.unshift({q:currentQ.q.substring(0,35)+'...', result:'✅ Correct', bal:`+$1`});
+    }else{
+      currentStreak=0;
+      document.getElementById('feedback').innerHTML=`<div class="alert alert-error pop">❌ Wrong! Correct: <b>${String.fromCharCode(65+currentQ.answer)}. ${currentQ.options[currentQ.answer]}</b><br><small>Balance inabaki vile vile</small></div>`;
+      historyList.unshift({q:currentQ.q.substring(0,35)+'...', result:'❌ Wrong', bal:'$0'});
+    }
+    document.getElementById('streakCount').innerText=`Streak: ${currentStreak} 🔥`;
+    document.getElementById('nextBtn').style.display='block';
+    updateHistory();
+    await updateBal();
+  }catch(e){
+    document.getElementById('feedback').innerHTML=`<div class="alert alert-error">Network error</div>`;
+    document.getElementById('nextBtn').style.display='block';
+  }
+}
+
+function updateHistory(){
+  const h=document.getElementById('history');
+  if(historyList.length===0) return;
+  h.innerHTML=historyList.slice(0,5).map(item=>`
+    <div class="history-item"><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.q}</span><span style="margin-left:8px;font-weight:700">${item.result}</span><span style="margin-left:8px;color:#7a00ff">${item.bal}</span></div>
+  `).join('');
+}
+
+function showDisqualified(seconds){
+  let left=seconds;
+  document.getElementById('question').innerText='⛔ DISQUALIFIED';
+  document.getElementById('options').innerHTML='';
+  document.getElementById('nextBtn').style.display='none';
+  const interval=setInterval(()=>{
+    left--;
+    const m=Math.floor(left/60); const s=left%60;
+    document.getElementById('status').innerHTML=`<div class="alert alert-error pop">❌ Failed 3 consecutive questions<br>Disqualified for <b>${m}m ${s}s</b><br><small>Rudi baada ya saa 1</small></div>`;
+    if(left<=0){ clearInterval(interval); location.reload(); }
+  },1000);
+}
+
+async function withdraw(){
+  const usd = document.getElementById('usdBal').innerText;
+  const kesText = document.getElementById('kesBal').innerText;
+  const kes = parseInt(kesText.replace(/[^0-9]/g,'')) || 0;
+
+  if(kes < 3000){
+    alert(`Min withdraw KES 3000. Una ${kesText}`);
+    return;
+  }
+
+  if(!confirm(`Withdraw ${kesText} (${usd}) kwenda ${localStorage.getItem('phoneFull')||phone}?\n\nConfirm?`)) return;
+
+  const btn = document.getElementById('withdrawBtn');
+  const oldText = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = '⏳ Sending M-Pesa...';
+
+  try{
+    const res = await fetch('/api/daraja/withdraw',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone, amountKES: kes})
+    });
+    const data = await res.json();
+    
+    if(data.success){
+      alert(`✅ ${data.msg}\n\n${data.simulated ? '[SIMULATED MODE - Bila Daraja keys]' : 'Uta-pokea M-Pesa in a few seconds'}`);
+      if(data.simulated){
+        location.reload();
+      }
+    }else{
+      alert(`❌ ${data.msg}`);
+      btn.disabled = false;
+      btn.innerText = oldText;
+    }
+  }catch(e){
+    alert("Network error: "+e.message);
+    btn.disabled = false;
+    btn.innerText = oldText;
+  }
+}
+
+loadQuestion();
+</script>
+</body>
+</html>
