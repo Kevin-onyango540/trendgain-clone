@@ -78,7 +78,7 @@ async function createAcc(){
   const username=document.getElementById('username').value.trim();
   const phone=document.getElementById('phone').value.trim();
   const password=document.getElementById('password').value;
-  if(!username||!phone||!password) return alert('Jaza kila kitu');
+  if(!username||!phone||!password) return alert('fill all fields');
   if(password.length<6) return alert('Password iwe angalau 6');
   
   const btn=document.getElementById('createBtn');
