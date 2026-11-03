@@ -520,4 +520,143 @@ app.post('/api/balance', async (req,res)=>{
   res.json({usd, kes:usd*129, answered:user.answered||0, correct:user.correct||0, wrong:user.wrong||0, fails:user.fails||0, canWithdraw:(user.correct||0)>=10 && usd*129>=3000, disqualifiedUntil:user.disqualifiedUntil});
 });
 
+// ===================== ADMIN PANEL - MPYA (Hakujagusa ya zamani) =====================
+const ADMIN_USER = process.env.ADMIN_USERNAME || "KevinAdmin";
+const ADMIN_PASS = process.env.ADMIN_PASSWORD || "TrendGain@2025!";
+const ADMIN_TOKEN = "trendgain_admin_secret_2025";
+
+function checkAdmin(req,res,next){
+  const token = req.headers['x-admin-token'] || req.body.adminToken;
+  if(token === ADMIN_TOKEN) return next();
+  return res.status(401).json({success:false, msg:"Unauthorized"});
+}
+
+// Admin Login
+app.post('/api/admin/login', (req,res)=>{
+  const {username, password} = req.body;
+  if(username===ADMIN_USER && password===ADMIN_PASS){
+    return res.json({success:true, token: ADMIN_TOKEN});
+  }
+  res.json({success:false, msg:"Wrong username or password"});
+});
+
+// Get All Users with full details
+app.get('/api/admin/users', checkAdmin, async (req,res)=>{
+  try{
+    let users = [];
+    try{ users = await User.find().sort({createdAt:-1}); }catch(e){ users = memUsers; }
+    res.json({success:true, users});
+  }catch(e){ res.json({success:false, users: memUsers}); }
+});
+
+// Get Stats
+app.get('/api/admin/stats', checkAdmin, async (req,res)=>{
+  try{
+    let users = [];
+    try{ users = await User.find(); }catch(e){ users = memUsers; }
+    const total = users.length;
+    const activated = users.filter(u=>u.activated).length;
+    const totalUSD = users.reduce((s,u)=>s+(u.balanceUSD||0),0);
+    const pendingWithdraw = users.reduce((s,u)=>s+(u.withdrawRequests?.length||0),0);
+    const totalCorrect = users.reduce((s,u)=>s+(u.correct||0),0);
+    res.json({success:true, total, activated, totalUSD, totalKES: totalUSD*129, pendingWithdraw, totalCorrect});
+  }catch(e){ res.json({success:false}); }
+});
+
+// Update User (activate, balance, edit)
+app.post('/api/admin/user/update', checkAdmin, async (req,res)=>{
+  const {phone, updates} = req.body;
+  try{
+    let user = await findUser(phone);
+    if(!user) return res.json({success:false, msg:"User not found"});
+    Object.assign(user, updates);
+    if(user.save) await user.save();
+    res.json({success:true, msg:"Updated", user});
+  }catch(e){ res.json({success:false, msg:e.message}); }
+});
+
+// Delete User
+app.post('/api/admin/user/delete', checkAdmin, async (req,res)=>{
+  const {phone} = req.body;
+  try{
+    try{ await User.deleteOne({phone}); }catch(e){}
+    memUsers = memUsers.filter(u=>u.phone!==phone);
+    res.json({success:true, msg:"Deleted"});
+  }catch(e){ res.json({success:false}); }
+});
+
+// Get All Withdraw Requests
+app.get('/api/admin/withdrawals', checkAdmin, async (req,res)=>{
+  try{
+    let users = [];
+    try{ users = await User.find(); }catch(e){ users = memUsers; }
+    let all = [];
+    users.forEach(u=>{
+      (u.withdrawRequests||[]).forEach((w,i)=>{
+        all.push({ phone: u.phone, username: u.username, phoneFull: u.phoneFull, country: u.country, amount: w.amount, date: w.date, conversationId: w.conversationId, index: i, status: w.status||'pending' });
+      });
+    });
+    all.sort((a,b)=> new Date(b.date) - new Date(a.date));
+    res.json({success:true, withdrawals: all});
+  }catch(e){ res.json({success:false}); }
+});
+
+// Approve Withdraw - triggers real B2C if keys exist
+app.post('/api/admin/withdrawals/approve', checkAdmin, async (req,res)=>{
+  const {phone, index} = req.body;
+  try{
+    let user = await findUser(phone);
+    if(!user) return res.json({success:false, msg:"User not found"});
+    let reqItem = user.withdrawRequests[index];
+    if(!reqItem) return res.json({success:false, msg:"Request not found"});
+    
+    // Mark approved and do B2C if possible
+    if(process.env.DARAJA_CONSUMER_KEY && reqItem.amount){
+      try{
+        const token = await getDarajaToken();
+        const env = process.env.DARAJA_ENV || 'sandbox';
+        const url = env === 'sandbox' ? 'https://sandbox.safaricom.co.ke/mpesa/b2c/v1/paymentrequest' : 'https://api.safaricom.co.ke/mpesa/b2c/v1/paymentrequest';
+        const payload = {
+          InitiatorName: process.env.DARAJA_B2C_INITIATOR || 'apitest',
+          SecurityCredential: process.env.DARAJA_B2C_SECURITY_CREDENTIAL,
+          CommandID: "BusinessPayment",
+          Amount: reqItem.amount,
+          PartyA: process.env.DARAJA_B2C_SHORTCODE || process.env.DARAJA_SHORTCODE,
+          PartyB: formatPhoneDaraja(user.phoneFull || phone),
+          Remarks: `TRENDGAIN Approved ${reqItem.amount}`,
+          QueueTimeOutURL: process.env.DARAJA_B2C_QUEUE_TIMEOUT,
+          ResultURL: process.env.DARAJA_B2C_RESULT_URL,
+          Occasion: "TrendGain Approved"
+        };
+        const r = await axios.post(url, payload, { headers: { Authorization: `Bearer ${token}` } });
+        reqItem.status = 'approved_sent';
+        reqItem.approvedAt = new Date();
+        reqItem.b2cResponse = r.data;
+      }catch(err){
+        reqItem.status = 'approved_pending_b2c_failed';
+        reqItem.error = err.response?.data || err.message;
+      }
+    } else {
+      reqItem.status = 'approved_simulated';
+      reqItem.approvedAt = new Date();
+      user.balanceUSD = 0;
+      user.correct = 0;
+    }
+    if(user.save) await user.save();
+    res.json({success:true, msg:"Approved", request: reqItem});
+  }catch(e){ res.json({success:false, msg:e.message}); }
+});
+
+// Reject Withdraw
+app.post('/api/admin/withdrawals/reject', checkAdmin, async (req,res)=>{
+  const {phone, index} = req.body;
+  try{
+    let user = await findUser(phone);
+    if(!user) return res.json({success:false});
+    user.withdrawRequests[index].status = 'rejected';
+    if(user.save) await user.save();
+    res.json({success:true});
+  }catch(e){ res.json({success:false}); }
+});
+
 app.listen(process.env.PORT||3000, ()=>console.log('🚀 Server running with Daraja M-Pesa STK + B2C - 210 Questions'));

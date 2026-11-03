@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendGain Admin - Kevin Only</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-[#0a0e1a] text-white min-h-screen">
+<!-- Login -->
+<div id="loginDiv" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-[#151a2d] p-8 rounded-2xl w-full max-w-md border border-[#2a3441]">
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center mb-3"><i class="fas fa-shield-halved text-2xl"></i></div>
+      <h1 class="text-2xl font-bold">Admin Panel</h1>
+      <p class="text-gray-400 text-sm">Kevin Only Access</p>
+    </div>
+    <input id="adminUser" placeholder="Username" class="w-full p-3 rounded-xl bg-[#0a0e1a] border border-gray-700 mb-3">
+    <input id="adminPass" type="password" placeholder="Password" class="w-full p-3 rounded-xl bg-[#0a0e1a] border border-gray-700 mb-4">
+    <button onclick="login()" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-xl font-bold">Login</button>
+    <p id="loginMsg" class="text-red-400 text-sm mt-3 text-center"></p>
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashDiv" class="hidden">
+  <div class="p-4 md:p-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-xl md:text-2xl font-bold"><i class="fas fa-chart-line text-blue-500"></i> TrendGain Admin</h1>
+      <button onclick="logout()" class="bg-red-600 px-4 py-2 rounded-xl text-sm">Logout</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-[#151a2d] p-4 rounded-2xl border border-gray-800"><p class="text-gray-400 text-xs">Total Users</p><p id="stTotal" class="text-2xl font-bold">0</p></div>
+      <div class="bg-[#151a2d] p-4 rounded-2xl border border-gray-800"><p class="text-gray-400 text-xs">Activated</p><p id="stActive" class="text-2xl font-bold text-green-400">0</p></div>
+      <div class="bg-[#151a2d] p-4 rounded-2xl border border-gray-800"><p class="text-gray-400 text-xs">Total Balance</p><p id="stBal" class="text-xl font-bold text-yellow-400">$0</p></div>
+      <div class="bg-[#151a2d] p-4 rounded-2xl border border-gray-800"><p class="text-gray-400 text-xs">Pending Withdraw</p><p id="stWith" class="text-2xl font-bold text-orange-400">0</p></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex gap-2 mb-4 overflow-x-auto">
+      <button onclick="showTab('users')" id="tabUsers" class="bg-blue-600 px-5 py-2 rounded-xl text-sm whitespace-nowrap">Users</button>
+      <button onclick="showTab('withdraw')" id="tabWith" class="bg-[#151a2d] px-5 py-2 rounded-xl text-sm whitespace-nowrap">Withdrawals</button>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="usersTab">
+      <input id="search" oninput="filterUsers()" placeholder="Search name, phone, country..." class="w-full p-3 rounded-xl bg-[#151a2d] border border-gray-700 mb-4">
+      <div class="bg-[#151a2d] rounded-2xl border border-gray-800 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-[#0a0e1a] text-gray-400"><tr><th class="p-3 text-left">User</th><th class="p-3">Phone</th><th class="p-3">Country</th><th class="p-3">Bal</th><th class="p-3">Correct</th><th class="p-3">Active</th><th class="p-3">Action</th></tr></thead>
+            <tbody id="usersBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Withdraw Tab -->
+    <div id="withdrawTab" class="hidden">
+      <div class="bg-[#151a2d] rounded-2xl border border-gray-800 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-[#0a0e1a] text-gray-400"><tr><th class="p-3 text-left">User</th><th class="p-3">Amount</th><th class="p-3">Date</th><th class="p-3">Status</th><th class="p-3">Action</th></tr></thead>
+            <tbody id="withBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let token = localStorage.getItem('adminToken')||'';
+let allUsers=[];
+if(token){ document.getElementById('loginDiv').classList.add('hidden'); document.getElementById('dashDiv').classList.remove('hidden'); loadAll(); }
+
+async function login(){
+  const username=document.getElementById('adminUser').value;
+  const password=document.getElementById('adminPass').value;
+  const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+  const d=await r.json();
+  if(d.success){ localStorage.setItem('adminToken',d.token); token=d.token; document.getElementById('loginDiv').classList.add('hidden'); document.getElementById('dashDiv').classList.remove('hidden'); loadAll(); } else { document.getElementById('loginMsg').innerText=d.msg; }
+}
+function logout(){ localStorage.removeItem('adminToken'); location.reload(); }
+
+async function loadAll(){ loadStats(); loadUsers(); loadWithdraw(); }
+async function loadStats(){
+  const r=await fetch('/api/admin/stats',{headers:{'x-admin-token':token}});
+  const d=await r.json();
+  if(d.success){ document.getElementById('stTotal').innerText=d.total; document.getElementById('stActive').innerText=d.activated; document.getElementById('stBal').innerText='$'+d.totalUSD+' / KES '+d.totalKES; document.getElementById('stWith').innerText=d.pendingWithdraw; }
+}
+async function loadUsers(){
+  const r=await fetch('/api/admin/users',{headers:{'x-admin-token':token}});
+  const d=await r.json();
+  if(d.success){ allUsers=d.users; renderUsers(d.users); }
+}
+function renderUsers(users){
+  const body=document.getElementById('usersBody');
+  body.innerHTML=users.map(u=>`
+    <tr class="border-t border-gray-800">
+      <td class="p-3"><div class="font-bold">${u.username||'-'}</div><div class="text-xs text-gray-400">${new Date(u.createdAt).toLocaleDateString()}</div></td>
+      <td class="p-3"><div>${u.phone}</div><div class="text-xs text-gray-400">${u.phoneFull||''}</div></td>
+      <td class="p-3">${u.country||''} ${u.countryCode||''}</td>
+      <td class="p-3">$${u.balanceUSD||0}</td>
+      <td class="p-3">${u.correct||0}/${u.answered||0}</td>
+      <td class="p-3">${u.activated?'<span class="text-green-400">Yes</span>':'<span class="text-red-400">No</span>'}</td>
+      <td class="p-3 flex gap-1">
+        <button onclick="toggleActive('${u.phone}',${!u.activated})" class="bg-blue-600 px-2 py-1 rounded text-xs">${u.activated?'Deactivate':'Activate'}</button>
+        <button onclick="editBal('${u.phone}')" class="bg-yellow-600 px-2 py-1 rounded text-xs">Edit $</button>
+        <button onclick="delUser('${u.phone}')" class="bg-red-600 px-2 py-1 rounded text-xs">Del</button>
+      </td>
+    </tr>
+  `).join('');
+}
+function filterUsers(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const f=allUsers.filter(u=> (u.username||'').toLowerCase().includes(q) || (u.phone||'').includes(q) || (u.country||'').toLowerCase().includes(q) || (u.phoneFull||'').includes(q));
+  renderUsers(f);
+}
+async function toggleActive(phone, active){
+  await fetch('/api/admin/user/update',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':token},body:JSON.stringify({phone, updates:{activated:active}})});
+  loadUsers(); loadStats();
+}
+async function editBal(phone){
+  const bal=prompt('New USD balance?');
+  if(bal===null) return;
+  await fetch('/api/admin/user/update',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':token},body:JSON.stringify({phone, updates:{balanceUSD: parseFloat(bal)}})});
+  loadUsers();
+}
+async function delUser(phone){
+  if(!confirm('Delete user '+phone+'?')) return;
+  await fetch('/api/admin/user/delete',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':token},body:JSON.stringify({phone})});
+  loadUsers(); loadStats();
+}
+function showTab(t){
+  document.getElementById('usersTab').classList.toggle('hidden', t!=='users');
+  document.getElementById('withdrawTab').classList.toggle('hidden', t!=='withdraw');
+  document.getElementById('tabUsers').className = t==='users' ? 'bg-blue-600 px-5 py-2 rounded-xl text-sm' : 'bg-[#151a2d] px-5 py-2 rounded-xl text-sm';
+  document.getElementById('tabWith').className = t==='withdraw' ? 'bg-blue-600 px-5 py-2 rounded-xl text-sm' : 'bg-[#151a2d] px-5 py-2 rounded-xl text-sm';
+  if(t==='withdraw') loadWithdraw();
+}
+async function loadWithdraw(){
+  const r=await fetch('/api/admin/withdrawals',{headers:{'x-admin-token':token}});
+  const d=await r.json();
+  if(!d.success) return;
+  document.getElementById('withBody').innerHTML=d.withdrawals.map(w=>`
+    <tr class="border-t border-gray-800">
+      <td class="p-3"><div class="font-bold">${w.username}</div><div class="text-xs">${w.phoneFull||w.phone} - ${w.country||''}</div></td>
+      <td class="p-3">KES ${w.amount}</td>
+      <td class="p-3 text-xs">${new Date(w.date).toLocaleString()}</td>
+      <td class="p-3"><span class="px-2 py-1 rounded text-xs ${w.status==='pending'?'bg-orange-600': w.status.includes('approved')?'bg-green-600':'bg-red-600'}">${w.status}</span></td>
+      <td class="p-3 flex gap-1">
+        ${w.status==='pending'?`<button onclick="approveW('${w.phone}',${w.index})" class="bg-green-600 px-3 py-1 rounded text-xs">Approve & Pay</button><button onclick="rejectW('${w.phone}',${w.index})" class="bg-red-600 px-2 py-1 rounded text-xs">Reject</button>`:'Done'}
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan=5 class="p-4 text-center text-gray-400">No withdrawals</td></tr>';
+}
+async function approveW(phone,index){
+  if(!confirm('Approve KES and send M-Pesa to '+phone+'?')) return;
+  const r=await fetch('/api/admin/withdrawals/approve',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':token},body:JSON.stringify({phone,index})});
+  const d=await r.json(); alert(d.msg||'Approved'); loadWithdraw(); loadUsers(); loadStats();
+}
+async function rejectW(phone,index){
+  if(!confirm('Reject?')) return;
+  await fetch('/api/admin/withdrawals/reject',{method:'POST',headers:{'Content-Type':'application/json','x-admin-token':token},body:JSON.stringify({phone,index})});
+  loadWithdraw();
+}
+</script>
+</body>
+</html>
