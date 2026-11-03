@@ -49,7 +49,7 @@ if(urlParams.get('created')==='1'){
 async function login(){
   const phone=document.getElementById('phone').value.trim();
   const password=document.getElementById('password').value;
-  if(!phone||!password) return alert('Jaza phone na password');
+  if(!phone||!password) return alert('fill phone and password');
 
   const btn=document.getElementById('loginBtn');
   btn.innerHTML='Signing in...'; btn.disabled=true;
