@@ -40,7 +40,7 @@ async function pay(){
   const btn = document.getElementById('payBtn');
   btn.disabled = true;
   btn.innerText = '⏳ Sending STK Push...';
-  document.getElementById('status').innerHTML = `<div class="alert alert-success" style="font-size:13px">📲 STK Push inatumwa kwa ${phoneFull}<br>Check your phone...</div>`;
+  document.getElementById('status').innerHTML = `<div class="alert alert-success" style="font-size:13px">📲 STK Push sent to ${phoneFull}<br>Check your phone...</div>`;
 
   try{
     const res = await fetch('/api/daraja/stkpush',{
